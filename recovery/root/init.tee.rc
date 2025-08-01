@@ -1,0 +1,74 @@
+# Start Daemon (Registry directories present)
+on post-fs-data
+    # h2k
+	on post-fs-data
+	mkdir /efs/cpk 0771 radio system
+	chown radio system /efs/cpk
+	exec -- /sbin/sh -c 'touch /efs/cpk/redata.bin'
+	chown radio system /efs/cpk/redata.bin
+	chmod 0644 /efs/cpk/redata.bin
+	chown radio radio /efs/cpk/h2k.dat
+	chmod 0644 /efs/cpk/h2k.dat
+	chown system system /efs/drm/h2k
+	restorecon_recursive /efs
+# insthk
+service insthk /vendor/bin/insthk
+    class core
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+    
+on property:sys.tzdaemon=Ready
+    start insthk
+
+on late-fs && property:vendor.tzdaemon=Ready
+    start insthk
+    
+on post-fs
+# TEEGRIS service
+    mkdir /mnt/vendor/efs/tee 0700 system system
+    mkdir /dev/socket/iwt 0770 system system
+    mkdir /dev/socket/iwt/ca 0770 system system
+    start tz_service
+    wait_for_prop vendor.tzdaemon Ready
+    setprop vendor.TEEGRIS.loaded true
+    write /proc/iccc_ready 1
+    start tzts_service
+    wait_for_prop vendor.tzts_daemon Ready
+
+on post-fs-data
+# TEEGRIS service
+    mkdir /data/vendor/tee 0700 system system
+
+service tz_service /vendor/bin/tzdaemon
+    class core
+    user root
+    group root readproc
+    disabled
+    seclabel u:r:recovery:s0
+    
+service tzts_service /vendor/bin/tzts_daemon
+    class core
+    user root
+    group root
+    disabled
+    
+    seclabel u:r:recovery:s0
+
+on init
+    #create mountpoint for /mnt/vendor/persist partition
+    mkdir /mnt/vendor/persist 0771 system system
+
+on post-fs
+    chown system system /mnt/vendor/persist
+    chmod 0771 /mnt/vendor/persist
+
+    # We restorecon /mnt/vendor/persist to set SEPolicy label.
+    restorecon /mnt/vendor/persist
+
+on post-fs-data
+    # Create /data/vendor/key_provisioning dir and get proper encryption policy installed
+    # Key Installation
+    mkdir /data/vendor/key_provisioning 0771 system system
